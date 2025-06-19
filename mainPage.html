@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microphone Web App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: white;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+            font-weight: 300;
+            background: linear-gradient(45deg, #fff, #f0f0f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .status {
+            margin-bottom: 30px;
+            padding: 15px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            font-size: 1.1rem;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            min-width: 120px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .record-btn {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+        }
+
+        .stop-btn {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a52);
+        }
+
+        .play-btn {
+            background: linear-gradient(45deg, #a8e6cf, #7fcdcd);
+        }
+
+        .visualizer {
+            width: 100%;
+            height: 150px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            margin-bottom: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+        }
+
+        .recording-indicator {
+            display: none;
+            width: 20px;
+            height: 20px;
+            background: #ff4757;
+            border-radius: 50%;
+            animation: pulse 1s infinite;
+            margin: 0 auto 20px;
+        }
+
+        .recording-indicator.active {
+            display: block;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .audio-info {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+
+        .permission-prompt {
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid rgba(255, 193, 7, 0.5);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .permission-prompt.show {
+            display: block;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            button {
+                width: 100%;
+                max-width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ Voice Recorder</h1>
+        
+        <div class="permission-prompt" id="permissionPrompt">
+            <strong>📱 Microphone Permission Required</strong><br>
+            Please allow microphone access to start recording.
+        </div>
+        
+        <div class="status" id="status">Ready to record</div>
+        
+        <div class="recording-indicator" id="recordingIndicator"></div>
+        
+        <div class="visualizer">
+            <canvas id="visualizer" width="400" height="150"></canvas>
+        </div>
+        
+        <div class="controls">
+            <button class="record-btn" id="recordBtn" onclick="startRecording()">🔴 Record</button>
+            <button class="stop-btn" id="stopBtn" onclick="stopRecording()" disabled>⏹️ Stop</button>
+            <button class="play-btn" id="playBtn" onclick="playRecording()" disabled>▶️ Play</button>
+        </div>
+        
+        <div class="audio-info" id="audioInfo" style="display: none;">
+            <div><strong>Duration:</strong> <span id="duration">0s</span></div>
+            <div><strong>Size:</strong> <span id="fileSize">0 KB</span></div>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob;
+        let audioUrl;
+        let isRecording = false;
+        let audioContext;
+        let analyser;
+        let microphone;
+        let dataArray;
+        let canvas;
+        let canvasContext;
+        let animationId;
+        let recordingStartTime;
+
+        // Initialize canvas
+        canvas = document.getElementById('visualizer');
+        canvasContext = canvas.getContext('2d');
+
+        // Status elements
+        const status = document.getElementById('status');
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const playBtn = document.getElementById('playBtn');
+        const recordingIndicator = document.getElementById('recordingIndicator');
+        const permissionPrompt = document.getElementById('permissionPrompt');
+        const audioInfo = document.getElementById('audioInfo');
+        const duration = document.getElementById('duration');
+        const fileSize = document.getElementById('fileSize');
+
+        async function startRecording() {
+            try {
+                // Request microphone permission
+                permissionPrompt.classList.add('show');
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 44100
+                    } 
+                });
+                
+                permissionPrompt.classList.remove('show');
+                
+                // Setup MediaRecorder
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+                
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // Update UI
+                    const recordingDuration = (Date.now() - recordingStartTime) / 1000;
+                    duration.textContent = `${recordingDuration.toFixed(1)}s`;
+                    fileSize.textContent = `${(audioBlob.size / 1024).toFixed(1)} KB`;
+                    audioInfo.style.display = 'block';
+                    
+                    playBtn.disabled = false;
+                    status.textContent = 'Recording saved! Ready to play or record again.';
+                    
+                    // Stop all tracks
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                // Setup audio visualization
+                setupAudioVisualization(stream);
+                
+                // Start recording
+                mediaRecorder.start();
+                recordingStartTime = Date.now();
+                isRecording = true;
+                
+                // Update UI
+                recordBtn.disabled = true;
+                stopBtn.disabled = false;
+                playBtn.disabled = true;
+                recordingIndicator.classList.add('active');
+                status.textContent = 'Recording... Speak into your microphone!';
+                
+                // Start visualization
+                visualize();
+                
+            } catch (error) {
+                console.error('Error accessing microphone:', error);
+                permissionPrompt.classList.remove('show');
+                if (error.name === 'NotAllowedError') {
+                    status.textContent = '❌ Microphone access denied. Please enable microphone permissions.';
+                } else if (error.name === 'NotFoundError') {
+                    status.textContent = '❌ No microphone found. Please connect a microphone.';
+                } else {
+                    status.textContent = '❌ Error accessing microphone. Please try again.';
+                }
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                
+                // Update UI
+                recordBtn.disabled = false;
+                stopBtn.disabled = true;
+                recordingIndicator.classList.remove('active');
+                
+                // Stop visualization
+                if (animationId) {
+                    cancelAnimationFrame(animationId);
+                }
+                
+                // Clear canvas
+                canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+                drawIdleState();
+            }
+        }
+
+        function playRecording() {
+            if (audioUrl) {
+                const audio = new Audio(audioUrl);
+                audio.play();
+                status.textContent = 'Playing recording...';
+                
+                audio.onended = () => {
+                    status.textContent = 'Playback finished. Ready to record or play again.';
+                };
+                
+                audio.onerror = () => {
+                    status.textContent = 'Error playing recording.';
+                };
+            }
+        }
+
+        function setupAudioVisualization(stream) {
+            audioContext = new AudioContext();
+            analyser = audioContext.createAnalyser();
+            microphone = audioContext.createMediaStreamSource(stream);
+            
+            analyser.fftSize = 256;
+            const bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+            
+            microphone.connect(analyser);
+        }
+
+        function visualize() {
+            if (!isRecording) return;
+            
+            animationId = requestAnimationFrame(visualize);
+            
+            analyser.getByteFrequencyData(dataArray);
+            
+            canvasContext.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            canvasContext.fillRect(0, 0, canvas.width, canvas.height);
+            
+            const barWidth = (canvas.width / dataArray.length) * 2.5;
+            let barHeight;
+            let x = 0;
+            
+            for (let i = 0; i < dataArray.length; i++) {
+                barHeight = (dataArray[i] / 255) * canvas.height * 0.8;
+                
+                const r = barHeight + 25 * (i / dataArray.length);
+                const g = 250 * (i / dataArray.length);
+                const b = 50;
+                
+                canvasContext.fillStyle = `rgb(${r},${g},${b})`;
+                canvasContext.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+                
+                x += barWidth + 1;
+            }
+        }
+
+        function drawIdleState() {
+            const gradient = canvasContext.createLinearGradient(0, 0, canvas.width, 0);
+            gradient.addColorStop(0, 'rgba(78, 205, 196, 0.3)');
+            gradient.addColorStop(0.5, 'rgba(68, 160, 141, 0.5)');
+            gradient.addColorStop(1, 'rgba(78, 205, 196, 0.3)');
+            
+            canvasContext.fillStyle = gradient;
+            canvasContext.fillRect(0, canvas.height / 2 - 2, canvas.width, 4);
+            
+            canvasContext.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            canvasContext.font = '14px Arial';
+            canvasContext.textAlign = 'center';
+            canvasContext.fillText('Audio Visualizer', canvas.width / 2, canvas.height / 2 - 20);
+        }
+
+        // Initialize idle state
+        drawIdleState();
+
+        // Check for microphone support
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            status.textContent = '❌ Microphone not supported in this browser.';
+            recordBtn.disabled = true;
+        }
+    </script>
+</body>
+</html>
